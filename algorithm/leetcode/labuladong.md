@@ -524,3 +524,150 @@ public:
 };
 
 ```
+
+## LinkedHashMap 和 ArrayHashMap
+
+### LinkedHashMap
+LinkedHashMap 是一种特殊的哈希表实现，它在保持哈希表高效查找的同时，还能维护元素的插入顺序或访问顺序。
+
+#### 核心特点
+1. **数据结构组合**：
+   - 使用哈希表（unordered_map）实现 O(1) 的查找
+   - 使用双向链表（list）维护元素顺序
+2. **两种顺序模式**：
+   - 插入顺序：元素按照插入的顺序排列（默认模式）
+   - 访问顺序：元素按照最近访问的时间排序（适用于 LRU 缓存）
+3. **时间复杂度**：
+   - 查找：O(1)
+   - 插入：O(1)
+   - 删除：O(1)
+   - 遍历：O(n)
+
+#### C++ 实现
+```cpp
+template<typename Key, typename Value>
+class LinkedHashMap {
+public:
+    typedef typename std::list<std::pair<Key, Value>>::iterator ListIterator;
+
+    LinkedHashMap(bool accessOrder = false) : accessOrder(accessOrder) {}
+
+    void put(const Key &key, const Value &value) {
+        auto it = map.find(key);
+        if (it != map.end()) {
+            it->second->second = value;
+            // 如果是访问顺序模式(accessOrder=true)，则将当前访问的节点移动到链表末尾
+            // 这样可以保持最近访问的节点总是在链表尾部，实现类似 LRU 缓存的访问顺序维护
+            if (accessOrder) {
+                order.splice(order.end(), order, it->second);
+            }
+        } else {
+            order.emplace_back(key, value);
+            auto iter = std::prev(order.end());
+            map[key] = iter;
+        }
+    }
+
+    Value get(const Key &key) {
+        auto it = map.find(key);
+        if (it == map.end()) {
+            throw std::runtime_error("Key not found");
+        }
+        if (accessOrder) {
+            order.splice(order.end(), order, it->second);
+        }
+        return it->second->second;
+    }
+
+    void remove(const Key &key) {
+        auto it = map.find(key);
+        if (it != map.end()) {
+            order.erase(it->second);
+            map.erase(it);
+        }
+    }
+
+private:
+    bool accessOrder;
+    std::list<std::pair<Key, Value>> order;
+    std::unordered_map<Key, ListIterator> map;
+};
+```
+
+### ArrayHashMap
+ArrayHashMap 是一种基于数组实现的简单哈希表，适用于数据量较小的场景。它使用两个并行数组分别存储键和值。
+
+#### 核心特点
+1. **数据结构**：
+   - 使用两个并行数组（vector）分别存储键和值
+   - 通过线性查找实现键值对的匹配
+2. **适用场景**：
+   - 数据量较小
+   - 内存敏感的环境
+3. **时间复杂度**：
+   - 查找：O(n)
+   - 插入：O(1)（末尾插入）或 O(n)（特定位置插入）
+   - 删除：O(n)
+   - 遍历：O(n)
+
+#### C++ 实现
+```cpp
+template<typename Key, typename Value>
+class ArrayHashMap {
+public:
+    void put(const Key &key, const Value &value) {
+        auto it = findKey(key);
+        if (it != keys.end()) {
+            size_t index = it - keys.begin();
+            values[index] = value;
+        } else {
+            keys.push_back(key);
+            values.push_back(value);
+        }
+    }
+
+    Value get(const Key &key) {
+        auto it = findKey(key);
+        if (it == keys.end()) {
+            throw std::runtime_error("Key not found");
+        }
+        size_t index = it - keys.begin();
+        return values[index];
+    }
+
+    void remove(const Key &key) {
+        auto it = findKey(key);
+        if (it != keys.end()) {
+            size_t index = it - keys.begin();
+            keys.erase(keys.begin() + index);
+            values.erase(values.begin() + index);
+        }
+    }
+
+private:
+    typename std::vector<Key>::iterator findKey(const Key &key) {
+        return std::find(keys.begin(), keys.end(), key);
+    }
+
+    std::vector<Key> keys;
+    std::vector<Value> values;
+};
+```
+
+### 两种实现的比较
+
+1. **内存占用**：
+   - LinkedHashMap：需要额外的链表指针和哈希表空间
+   - ArrayHashMap：仅需要两个数组空间，内存效率更高
+
+2. **性能特点**：
+   - LinkedHashMap：所有操作都是 O(1)，但有额外的内存开销
+   - ArrayHashMap：查找和删除是 O(n)，但在小数据量时可能更快
+
+3. **使用场景**：
+   - LinkedHashMap：需要快速查找且需要维护顺序的场景，如 LRU 缓存
+   - ArrayHashMap：数据量小、内存受限的场景，如嵌入式系统或移动设备
+
+4. **实现复杂度**：
+   - LinkedHashMap：实现较复杂，需要维护双向链表和哈希表
+   - ArrayHashMap：实现简单，易于理解和维护
