@@ -671,3 +671,231 @@ private:
 4. **实现复杂度**：
    - LinkedHashMap：实现较复杂，需要维护双向链表和哈希表
    - ArrayHashMap：实现简单，易于理解和维护
+
+
+## 二叉树
+### 常见二叉树的集中类型以及定义
+1. 满二叉树
+- 所有节点都有两个子节点
+- 所有叶子节点都在同一层
+- 满二叉树的节点数为 $2^h - 1$，其中 $h$ 是树的高度
+
+2. 完全二叉树
+- 所有节点都连续存储在数组中
+- 除了最后一层，其他层的节点数都是满的
+- 最后一层的节点都靠左排列
+
+3. 二叉搜索树
+- 对于树中的每个节点，其左子树的每个节点的值都要小于这个节点的值，右子树的每个节点的值都要大于这个节点的值。你可以简单记为「左小右大」。
+
+4. 平衡二叉搜索树
+- 二叉搜索树中，每个节点的左子树和右子树的高度差不能大于 1。
+- 平衡二叉搜索树的目的是让树的结构更加平衡，减少搜索时间。
+
+### 二叉树的遍历
+- 递归遍历
+    - 这里注意一个概念，树的遍历顺序是不变的，所谓的「前序」「中序」「后序」其实是你代码的执行顺序，例如代码是 Print，那么前序位置就是打印根节点，中序位置就是打印左子树，后序位置就是打印右子树。
+```C++
+// 二叉树的遍历框架
+void traverse(TreeNode* root) {
+    if (root == nullptr) {
+        return;
+    }
+    // 前序位置
+    traverse(root->left);
+    // 中序位置
+    traverse(root->right);
+    // 后序位置
+}
+```
+
+- 层序遍历
+- 层序遍历的执行顺序是：
+    - 从上到下，从左到右依次打印每个节点
+    - 层序遍历的实现方式是使用队列，将每个节点加入队列，然后依次打印队列中的每个节点
+    - 层序遍历的代码实现如下：
+```C++
+void levelOrderTraverse(TreeNode* root) {
+    if (root == nullptr) {
+        return;
+    }
+    queue<TreeNode*> q;
+    q.push(root);
+    // 记录当前遍历到的层数（根节点视为第 1 层）
+    int depth = 1;
+
+    while (!q.empty()) {
+        int sz = q.size();
+        for (int i = 0; i < sz; i++) {
+            TreeNode* cur = q.front();
+            q.pop();
+            // 访问 cur 节点，同时知道它所在的层数
+            cout << "depth = " << depth << ", val = " << cur->val << endl;
+
+            // 把 cur 的左右子节点加入队列
+            if (cur->left != nullptr) {
+                q.push(cur->left);
+            }
+            if (cur->right != nullptr) {
+                q.push(cur->right);
+            }
+        }
+        depth++;
+    }
+}
+```
+
+### 为什么 BFS 常用来寻找最短路径（根节点到叶子节点的最短路径）
+- 如果使用 DFS，需要遍历完整棵树
+- 如果使用 BFS，只要找到第一个叶子节点即可
+
+### 为什么 DFS 常用来寻找所有路径（根节点到叶子节点的所有路径）
+- 使用 DFS，代码结构简单，因为这里的遍历本身就是要遍历所有路径
+- 使用 BFS，代码结构复杂，因为需要记录每个节点的路径
+
+## 多叉树
+- 多叉树的定义是：每个节点有多个子节点
+
+```C++
+class TreeNode {
+    int val;
+    vector<TreeNode*> children;
+};
+
+
+// N 叉树的遍历框架
+void traverse(TreeNode* root) {
+    if (root == nullptr) {
+        return;
+    }
+    // 前序位置
+    for (TreeNode* child : root->children) {
+        traverse(child);
+    }
+    // 后序位置
+}
+
+```
+## 图
+图是一种用来表示对象之间关系的数据结构，由顶点（Vertex）和边（Edge）组成。
+
+- **无向图**：边没有方向，例如朋友关系。
+- **有向图**：边有方向，例如网页链接。
+- **加权图**：边带有权值，常用于计算最短路径等问题。
+
+### 图的表示方法
+
+#### 邻接矩阵
+
+使用二维数组表示各顶点之间的边关系，适用于稠密图，但会消耗较多内存。
+
+#### 邻接表
+
+使用数组或向量来存储每个顶点的所有邻接顶点，适用于稀疏图，空间利用率较高。
+
+### 图的基本操作与遍历
+### 广度优先搜索 (BFS)
+
+BFS 从起始顶点开始，利用队列按层次遍历图，常用于求解无权图中的最短路径。
+
+#### 示例代码：
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <queue>
+using namespace std;
+
+class Graph {
+public:
+    // 构造函数：初始化图的顶点数量，并构造邻接表
+    Graph(int vertices) : V(vertices) {
+        adj.resize(V);
+    }
+    
+    // 添加边：默认无向图，若为有向图，将 directed 参数设为 true
+    void addEdge(int u, int v, bool directed = false) {
+        adj[u].push_back(v);
+        if (!directed) {
+            adj[v].push_back(u);
+        }
+    }
+    
+    // 广度优先搜索（BFS）从起点 s 开始
+    void BFS(int s) {
+        vector<bool> visited(V, false);
+        queue<int> q;
+        
+        visited[s] = true;
+        q.push(s);
+        
+        cout << "BFS: ";
+        while (!q.empty()) {
+            int u = q.front();
+            q.pop();
+            cout << u << " ";
+            
+            for (int v : adj[u]) {
+                if (!visited[v]) {
+                    visited[v] = true;
+                    q.push(v);
+                }
+            }
+        }
+        cout << endl;
+    }
+    
+private:
+    int V; // 顶点数量
+    vector<vector<int>> adj; // 邻接表
+};
+```
+
+### 深度优先搜索 (DFS)
+
+DFS 利用递归或栈，从某个顶点开始深度遍历，适用于探索所有路径、检测环等问题。
+- visited 数组的剪枝作用，这个遍历函数会遍历一次图中的所有节点，并尝试遍历一次所有边，所以算法的时间复杂度是 O(E+V)，其中 E 是边的总数，V 是节点的总数。
+- 时间复杂度：O(E+V), 相比之下，二叉树的遍历时间复杂度是 O(N)，N 是节点的总数。可以把二叉树看做特殊的图，但是二叉树的边数是 2N，所以时间复杂度是 O(2N+N) = O(N)。
+
+#### 示例代码：
+
+```cpp
+#include <iostream>
+#include <vector>
+using namespace std;
+
+class Graph {
+public:
+    Graph(int vertices) : V(vertices) {
+        adj.resize(V);
+    }
+    
+    void addEdge(int u, int v, bool directed = false) {
+        adj[u].push_back(v);
+        if (!directed) {
+            adj[v].push_back(u);
+        }
+    }
+    
+    void DFSUtil(int v, vector<bool>& visited) {
+        visited[v] = true;
+        cout << v << " ";
+        for (int u : adj[v]) {
+            if (!visited[u]) {
+                DFSUtil(u, visited);
+            }
+        }
+    }
+    
+    void DFS(int v) {
+        vector<bool> visited(V, false);
+        cout << "DFS: ";
+        DFSUtil(v, visited);
+        cout << endl;
+    }
+    
+private:
+    int V;
+    vector<vector<int>> adj;
+};
+```
