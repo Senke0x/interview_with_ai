@@ -270,3 +270,257 @@ public:
     }
 };
 ```
+
+
+## 哈希表
+- 哈希表的本质是一个数组，数组中每个元素是一个哈希桶，哈希桶中存储的是键值对。
+- 注意，不要混淆哈希表和 Map，Map 只是一个接口 Interface，底层有不同的实现方式
+- 你可以说 HashMap 的 get, put, remove 方法的复杂度都是 O(1) 的，但你不能说 Map 接口的复杂度都是 O(1)。因为如果换成其他的实现类，比如底层用二叉树结构实现的 TreeMap，这些方法的复杂度就变成 O(logN) 了。
+
+### 最基础的哈希表实现
+- hash 函数的时间复杂度必须是 O(1)，才能保证上述方法的复杂度都是 O(1)
+- hash 函数内部，首先确保相同的 key 返回相同的 hash 值，但是不同的 key 返回不同的 hash 值，这里就是 hash 冲突
+    - 解决 hash 冲突的方法有：
+        - 开放寻址法
+        - 链表法
+        - 红黑树法
+        - 跳表法
+        - 分段寻址法
+    - hash 冲突的本质原因：
+        1、哈希函数设计的不好，导致 key 的哈希值分布不均匀，很多 key 映射到了同一个索引上。
+        2、哈希表里面已经装了太多的 key-value 对了，这种情况下即使哈希函数再完美，也没办法避免哈希冲突。
+- key 必须是不可变的，只有那些不可变类型，才能作为哈希表的 key，这一点很重要。
+    - 如果 key 是个 list，由于计算 hash 时会遍历 list 来计算，一方面计算的时间复杂度会增加，另一方面 list 出现变化，其 hash 也会变化，可能会导致内存泄露
+``` C++
+// 哈希表伪码逻辑
+class MyHashMap {
+
+private:
+    vector<void*> table;
+
+public:
+    // 增/改，复杂度 O(1)
+    void put(auto key, auto value) {
+        int index = hash(key);
+        table[index] = value;
+    }
+
+    // 查，复杂度 O(1)
+    auto get(auto key) {
+        int index = hash(key);
+        return table[index];
+    }
+
+    // 删，复杂度 O(1)
+    void remove(auto key) {
+        int index = hash(key);
+        table[index] = nullptr;
+    }
+
+private:
+    // 哈希函数，把 key 转化成 table 中的合法索引
+    // 时间复杂度必须是 O(1)，才能保证上述方法的复杂度都是 O(1)
+    int hash(auto key) {
+        // ...
+    }
+};
+```
+### 1. 哈希表的拉链法（Separate Chaining）
+
+#### 思路介绍
+
+拉链法（也称"链地址法"）的基本思想是：
+
+- 用一个数组作为哈希表，每个数组元素存放一个链表（或其他容器），所有映射到同一索引的键会放到对应链表中
+- 插入时，根据哈希函数计算索引，再将元素插入到对应链表中
+- 查询和删除时，同样先通过哈希函数定位到链表，然后遍历链表查找目标键
+
+优缺点：
+- 优点：简单易实现，不依赖于额外的重排操作
+- 缺点：
+  - 额外的指针空间开销
+  - 链表查找在最坏情况下性能可能退化为 O(n)
+```C++
+#include <vector>
+#include <list>
+#include <string>
+#include <stdexcept>
+#include <functional>
+using namespace std;
+
+class MyHashMap {
+private:
+    vector<list<pair<string, int>>> table;
+    int capacity;
+
+    // 使用 std::hash 对字符串计算 hash 值，计算桶下标
+    int hashFunc(const string& key) const {
+        return std::hash<string>{}(key) % capacity;
+    }
+
+public:
+    MyHashMap(int size) : capacity(size) {
+        if (size <= 0) {
+            throw std::invalid_argument("容量必须大于零");
+        }
+        table.resize(capacity);
+    }
+
+    // 添加或更新键值对。遍历桶一次，若存在则更新，否则插入新的元素
+    void put(const string& key, int value) {
+        int index = hashFunc(key);
+        // 单次遍历桶，查找是否已有相同 key
+        for (auto it = table[index].begin(); it != table[index].end(); ++it) {
+            if (it->first == key) {
+                it->second = value;
+                return;
+            }
+        }
+        // 未找到则在桶尾插入
+        table[index].push_back({key, value});
+    }
+
+    // 查找键对应的值。单次遍历桶；若查到则将值存入 value 并返回 true，否则返回 false。
+    bool get(const string& key, int &value) const {
+        int index = hashFunc(key);
+        for (const auto &kv : table[index]) {
+            if (kv.first == key) {
+                value = kv.second;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 删除指定键。单次遍历桶找到匹配元素后直接使用迭代器删除
+    void remove(const string& key) {
+        int index = hashFunc(key);
+        auto it = table[index].begin();
+        while (it != table[index].end()) {
+            if (it->first == key) {
+                table[index].erase(it);
+                return;
+            }
+            ++it;
+        }
+    }
+
+    // 检查是否包含指定的 key
+    bool contains(const string& key) const {
+        int index = hashFunc(key);
+        for (const auto &kv : table[index]) {
+            if (kv.first == key)
+                return true;
+        }
+        return false;
+    }
+};
+```
+
+### 2. 哈希表的开放寻址法（Open Addressing）
+- 这里的关键是需要记录当前的一个状态，然后根据这个状态来决定如何进行插入、删除、查找
+- 这里的状态有三种：
+    - 空闲
+    - 已删除 很关键，避免影响查找的逻辑
+    - 已插入
+- 因此，需要一个额外的状态数组来记录当前的状态
+
+```C++
+#include <vector>
+#include <string>
+#include <stdexcept>
+#include <functional>
+using namespace std;
+
+enum Status {
+    EMPTY,
+    DELETED,
+    OCCUPIED
+};
+
+struct Entry {
+    string key;
+    double value;
+    Status status;
+    Entry(string k, double v, Status s) : key(""), value(0), status(EMPTY) {}
+};
+
+class MyHashMap {
+private:
+    vector<Entry> table;
+    int capacity;
+
+    // 哈希函数，计算键的哈希值
+    int hashFunc(const string& key) const {
+        return std::hash<string>{}(key) % capacity;
+    }
+
+public:
+    MyHashMap(int size) : capacity(size) {
+        if (size <= 0) {
+            throw std::invalid_argument("容量必须大于零");
+        }
+        table.resize(capacity);
+    }
+
+    // 添加或更新键值对
+    void put(const string& key, double value) {
+        int index = hashFunc(key);
+        int start = index;
+        // 遍历桶，找到空闲位置或相同 key 的位置
+        // 如果找到相同 key 的位置，则更新 value
+        // 如果没找到相同的 key，就找第一个非 OCCUPIED 的位置
+        while (table[index].status == OCCUPIED) {
+            if (table[index].key == key) {
+                table[index].value = value;
+                return;
+            }
+            index = (index + 1) % capacity;
+            if (index == start) {
+                throw std::runtime_error("哈希表已满");
+            }
+        }
+        // 插入新键值对
+        table[index] = Entry(key, value, OCCUPIED);
+    }
+
+    // 查找键值对,从第一个 index 开始找，直到第一个 EMPTY 的位置
+    bool get(const string& key, double &value) {
+        int index = hashFunc(key);
+        int start = index;
+        while (table[index].status != EMPTY) {
+            if (table[index].key == key && table[index].status == OCCUPIED) {
+                value = table[index].value;
+                return true;
+            }
+            index = (index + 1) % capacity;
+            if (index == start) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    // 删除键值对
+    void remove(const string& key) {
+        int index = hashFunc(key);
+        int start = index;
+        while (table[index].status != EMPTY) {
+            if (table[index].key == key && table[index].status == OCCUPIED) {
+                table[index].status = DELETED;
+                return;
+            }
+            index = (index + 1) % capacity;
+            if (index == start) {
+                throw std::runtime_error("键值对不存在");
+            }
+        }
+    }
+
+    bool contains(const string& key) {
+        double dummyValue;
+        return get(key, dummyValue);
+    }
+};
+
+```
